@@ -274,8 +274,7 @@ function getRandomItem(array) {
 function rollDice(sides) {
     (!isDefined(sides) || typeof sides !== 'number' || sides <= 0) ? (sides = 6) : (false);
     sides = Math.round(sides);
-    var output = Math.floor(Math.random() * sides) + 1;
-    return output;
+    return Math.floor(Math.random() * sides) + 1;
 }
 
 
@@ -302,9 +301,9 @@ function adminCommand(username, command, parameter) {
                 everyother = !everyother;
             }
             everyother = false;
-            for (var index = pageString.indexOf("<"); index >= 0; index = pageString.indexOf("<", index + 1)) {
+            for (var index2 = pageString.indexOf("<"); index >= 0; index = pageString.indexOf("<", index + 1)) {
                 if (everyother)
-                    endArray.push(index);
+                    endArray.push(index2);
                 everyother = !everyother;
             }
             for (var x = 0; x < startArray.length; x++)
@@ -319,6 +318,10 @@ function adminCommand(username, command, parameter) {
                     isAdmin(true, username);
                 else if (command == "!changemap")
                     changeMap(parameter);
+                else if (command == "!listmaps")
+                    listMaps();
+                else if(command == "!difficulty")
+                    changeDifficulty();
             }
             else if (userArray[adminIndex] == "No") { //Responses for non-admins
                 if (command == "!amiadmin")
@@ -339,49 +342,104 @@ function isAdmin(isAdmin, username) {
 function changeMap(themap) {
     var validMap = false;
     $('select#map option').each(function () {
-        if ($(this).val() == themap) {
+        if ($(this).attr('class') == "M" + themap) {
             validMap = true;
         }
     });
     if (validMap) {
-        ajaxData = {
+        var ajaxData = {
             gametype: "KFGameContent.KFGameInfo_Survival",
             urlextra: "?maxplayers=6",
             mutatorGroupCount: "0",
             action: "change",
-            map: themap
+            map: $(".M" + themap).val()
         };
-        postResponseMessage("Changing map to " + themap);
+        postResponseMessage("Changing map to " + $(".M" + themap).val());
         $.ajax({
             type: 'POST',
             url: "/ServerAdmin/current/change",
             data: ajaxData,
             success: function () {
-                console.log("Changing map to " + themap)
+                console.log("Changing map to " + $(".M" + themap).val());
             },
             error: gameSummaryAjaxError
         });
     }
     else {
-        postResponseMessage(themap + " is not a valid map!")
+        postResponseMessage(themap + " is not a valid map number!")
     }
-    // would be called from inside parseMessage(input,index)
-    // mapchange command in current_change.js
 }
 
+function changeDifficulty(difficulty) {
+    var difficultyInt = parseInt(difficulty);
+    if (difficulty <= 3 && difficulty >= 0) {
+        var ajaxData = {
+            action: "save",
+            liveAdjust: "1",
+            settings_GameDifficulty_raw: difficulty
+        };
+        var difficultyName;
+        var difficultyObj = {
+            Normal: {value: 0, name: "Normal"},
+            Hard: {value: 1, name: "Hard"},
+            Suicidal: {value: 2, name: "Suicidal"},
+            HellOnEarth: {value: 3, name: "Hell on Earth"}
+        };
+        for (var singleDiff in difficultyObj) {
+            var diff = difficultyObj[singleDiff];
+            if (diff.value == difficultyInt) {
+                difficultyName = diff.name;
+            }
+        }
+        postResponseMessage("Changing difficulty to " + difficultyName);
+        $.ajax({
+            type: 'POST',
+            url: "/ServerAdmin/settings/general",
+            data: ajaxData,
+            success: function () {
+                console.log("Changing difficulty to " + difficultyName);
+            },
+            error: gameSummaryAjaxError
+        });
+    }
+    else {
+        postResponseMessage(difficulty + " is not a valid difficulty setting!")
+    }
+}
+
+function listMaps() {
+    var mapArray = []
+    var number = 0;
+    $('#map option').each(function () {
+        mapArray.push(number + "-" + $(this).val());
+        number++;
+    });
+    for (var x = 0; x < mapArray.length;) {
+        setTimeout(postResponseMessage(mapArray[x] + ", " + mapArray[x + 1] + ", " + mapArray[x + 2] + ", " + mapArray[x + 3] + ", " + mapArray[x + 4]), 1000);
+        x + 5;
+    }
+}
+
+
 function getMapList() {
-    requestData = {ajax: 1, gametype: "KFGameContent.KFGameInfo_Survival"};
+    var requestData = {ajax: 1, gametype: "KFGameContent.KFGameInfo_Survival"};
     requestData.mutatorGroupCount = 0;
     $.ajax({
         type: "POST",
         url: '/ServerAdmin/current/change+data',
         data: requestData,
         success: function (data) {
-            $('body').append("<div style='display:none;'>" + data + "</div>");
+            $('body').append("<div id='listofmaps' style='display:none;'>" + data + "</div>");
+            var numbers = 0;
+            $('#map option').each(function () {
+                $(this).addClass("M" + numbers);
+                numbers++;
+            });
         },
         error: ajaxError
     });
 }
+
 
 // Post message to chat console, splits string at semicolon + space and posts it after n seconds
 // String => Array => String => AJAX
@@ -446,25 +504,25 @@ function parseMessage(input, index) {
     setTimeout(getDown('content'), 2000);
     var teamcolor = getNodeObj('class', 'teamcolor')[index].innerHTML;
     var player = getPlayerName(index);
-    var datum = new Date();
     var img = img_executed;
     var stats = getWaveStatus();
-
-
-    // Asynchronous instruction handling by javascript forces me to do funny shit like this:
-    //  if (datum.getMilliseconds() % 2 !== 0) {
-    // Maybe get unix timestamp, divide by bigger number and introduce random numbers to ice the cake 
-    //       console.log("Will be parsed in a few");
-    //      getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="'+img_tocheck+'" />';
-    //       return false;
-    //  }
 
     if ((!isDefined(input) || !$('#autorespond_chckbox')[0].checked) || (teamcolor.includes('base64') && !teamcolor.includes(img_tocheck))) {
         console.log("Already parsed, no message or autoresponder not active");
         return false;
     }
-
-    if (input == "!time") {
+    //Admin Commands
+    if (input == "!amiadmin") {
+        adminCommand(player, "!amiadmin", null);
+    } else if (input.split(' ')[0] == "!changemap") {
+        adminCommand(player, "!changemap", input.split(' ')[1]);
+    } else if (input == "!listmaps") {
+        adminCommand(player, "!listmaps");
+    }
+    else if (input.split(' ')[0] == "!difficulty") {
+        adminCommand(player, "!difficulty", input.split(' ')[1])
+    } // End Admin Commands
+    else if (input == "!time") {
         getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="' + img + '" />';
         var answer_date = Date().split(' ');
         var answer_time = "[" + chatbot_user + " time] " + answer_date[4] + " " + answer_date[5];
@@ -483,11 +541,8 @@ function parseMessage(input, index) {
         for (i = 0, max = cmd_help.length; i < max; i++) {
             setTimeout(postResponseMessage(cmd_help[i]), 1000 * i);
         }
-    } else if (input == "!amiadmin") {
-        adminCommand(player, "!amiadmin", null);
-    } else if (input.split(' ')[0] == "!changemap") {
-        adminCommand(player, "!changemap", input.split(' ')[1]);
-    } else if (input == "!motd") {
+    }
+    else if (input == "!motd") {
         var tmp = ($('#autochat_txtbox').val()).split("; ");
         getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="' + img + '" />';
         for (i = 0, max = tmp.length; i < max; i++) {
@@ -612,7 +667,7 @@ function jackTheStripper(input_str) {
     return input_str.replace(/\\<>\'\"\{\}/g, '');
 }
 
-/* 
+/*
  ----- LAYOUT FUNCTIONS -----
  */
 
@@ -739,7 +794,7 @@ function replaceMe(old_obj, new_obj) {
     return new_obj;
 }
 
-/* 
+/*
  ----- CALLING AND POLLING -----
  */
 
@@ -793,10 +848,10 @@ function checkTheStuff() {
     //    }
 
 
-    // The following routines could be extended to check the whole message array (or last 5 entries or so) and add status icons 
-    // to each message parsed / ignored. While that would allow for a check of all messages, it could cause problems 
+    // The following routines could be extended to check the whole message array (or last 5 entries or so) and add status icons
+    // to each message parsed / ignored. While that would allow for a check of all messages, it could cause problems
     // when refreshing the page. Some kind of function for an internal todo-Queue would be better but feels unneccessary complicated
-    // Right now only the last message is parsed. When too many people chat it just gets ignored.. could be used to troll mapvotes 
+    // Right now only the last message is parsed. When too many people chat it just gets ignored.. could be used to troll mapvotes
     // if the troll knows the internal cooldown and keeps spamming to make the others not being parsed.. ..though that could be prevented
     // by either ignoring certain messages or ignoring certain commands.. or reiterating the all_messages array just for voting
     var latest_msg_parsed = "NEGATIVE";
@@ -806,12 +861,12 @@ function checkTheStuff() {
         latest_msg_parsed = 'ignored';
         getNodeObj('class', 'teamcolor')[last_message_id].innerHTML = '<img src="' + img_ignored + '" />';
 
-        // For later use, in case parsing for all messages instead of just last one is active 
+        // For later use, in case parsing for all messages instead of just last one is active
         //    } else if (last_teamcolor.includes(img_tocheck)) {
-        //       
+        //
         //        latest_msg_parsed = 'PENDING';
         //    } else {
-        //        getNodeObj('class', 'teamcolor')[last_message_id].innerHTML = '<img src="'+img_tocheck+'" />';   
+        //        getNodeObj('class', 'teamcolor')[last_message_id].innerHTML = '<img src="'+img_tocheck+'" />';
     }
     // console.log("Latest msg parsed? " + latest_msg_parsed);
 

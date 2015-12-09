@@ -182,3 +182,18 @@
  array[i] = array[i].replace(/(\s+)/, "")
  }
  array.clean("");*/
+
+// Asynchronous instruction handling by javascript forces me to do funny shit like this:
+//  if (datum.getMilliseconds() % 2 !== 0) {
+// Maybe get unix timestamp, divide by bigger number and introduce random numbers to ice the cake
+//       console.log("Will be parsed in a few");
+//      getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="'+img_tocheck+'" />';
+//       return false;
+//  }
+
+/*
+action: save
+liveAdjust: 1
+settings_GameDifficulty_raw: 0 1 2 3
+
+ */
