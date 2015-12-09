@@ -168,3 +168,17 @@
 //    if(s_ajaxListener.method.toLowerCase() == 'post' && !s_ajaxListener.url.includes('gamesummary'))s_ajaxListener.data = x;
 //    s_ajaxListener.callback(checkTheStuff());
 //};
+
+
+
+/*$('#players-list').append(useradmin);
+ var string = $('#players-list').text();
+ $('#players-list').text("");
+ var array = string.split(/(\s+)/);
+ for (var x = 0; x < array.length; x++) {
+ array[x] = array[x].replace(/(\r\n|\n|\r)/gm, "")
+ }
+ for (var i = 1; i < array.length; i++) {
+ array[i] = array[i].replace(/(\s+)/, "")
+ }
+ array.clean("");*/

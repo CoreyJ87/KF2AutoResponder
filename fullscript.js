@@ -174,37 +174,6 @@ function isDefined(object) {
     return (typeof object !== 'undefined' && object !== null && object !== '');
 }
 
-function isAdmin(username) {
-    $.ajax({
-        type: "GET",
-        url: '/ServerAdmin/current/players',
-        success: function (page) {
-            var startInt = page.search(username);
-            var endInt = startInt + 220;
-            var useradmin = page.slice(startInt, endInt);
-            $('#players-list').append(useradmin);
-            var string = $('#players-list').text();
-            $('#players-list').text("");
-            var array = string.split(/(\s+)/);
-            for (var x = 0; x < array.length; x++) {
-                array[x] = array[x].replace(/(\r\n|\n|\r)/gm, "")
-            }
-            for (var i = 1; i < array.length; i++) {
-                array[i] = array[i].replace(/(\s+)/, "")
-            }
-            array.clean("");
-            var adminIndex = array.length-1;
-            console.log(array[adminIndex]);
-            if (array[adminIndex] == "Yes") {
-                postResponseMessage("Yes you are: " + username);
-            } else {
-                postResponseMessage("No you are not: " + username);
-            }
-        },
-        error: ajaxError
-    });
-}
-
 // Compare two URL Strings that aren't empty, split them at anchor / div marker '#' by default
 // String x String => Boolean
 // TODO: Replace by jQuery.. or dont
@@ -216,6 +185,10 @@ function cmpUrl(haystack, needle) {
     } else {
         return true;
     }
+}
+
+function escapeRegExp(str) {
+    return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
 }
 
 // Help function to construct jQuery element searches
@@ -237,6 +210,16 @@ function getNodeObj(type_name, object_name) {
 function checkUrl() {
     if (cmpUrl(target_url, location.pathname)) {
         addAutoChatDiv();
+        getMapList();
+        Array.prototype.clean = function (deleteValue) {
+            for (var i = 0; i < this.length; i++) {
+                if (this[i] == deleteValue) {
+                    this.splice(i, 1);
+                    i--;
+                }
+            }
+            return this;
+        };
         setTimeout(shoveOffYouTosser(), 500);
         setTimeout(addInfoDiv(), 500);
         setTimeout(addStatusDiv(), 500);
@@ -300,6 +283,106 @@ function rollDice(sides) {
  ----- READ, POST MESSAGES AND EXECUTE COMMANDS -----
  */
 
+function adminCommand(username, command, parameter) {
+    $.ajax({
+        type: "GET",
+        url: '/ServerAdmin/current/players',
+        success: function (page) {
+            username = escapeRegExp(username);
+            var startInt = page.search(username);
+            var endInt = startInt + 230;
+            var pageString = "<td>" + page.slice(startInt, endInt);
+            var userArray = [];
+            var startArray = [];
+            var endArray = [];
+            var everyother = true;
+            for (var index = pageString.indexOf(">"); index >= 0; index = pageString.indexOf(">", index + 1)) {
+                if (everyother)
+                    startArray.push(index + 1);
+                everyother = !everyother;
+            }
+            everyother = false;
+            for (var index = pageString.indexOf("<"); index >= 0; index = pageString.indexOf("<", index + 1)) {
+                if (everyother)
+                    endArray.push(index);
+                everyother = !everyother;
+            }
+            for (var x = 0; x < startArray.length; x++)
+                userArray.push(pageString.substring(startArray[x], endArray[x]));
+            userArray.pop();
+            var adminIndex = userArray.length - 2;
+
+            console.log(userArray);
+            console.log(userArray[adminIndex]);
+            if (userArray[adminIndex] == "Yes") { //Functions for admins
+                if (command == "!amiadmin")
+                    isAdmin(true, username);
+                else if (command == "!changemap")
+                    changeMap(parameter);
+            }
+            else if (userArray[adminIndex] == "No") { //Responses for non-admins
+                if (command == "!amiadmin")
+                    isAdmin(false, username);
+            }
+        },
+        error: ajaxError
+    });
+}
+
+function isAdmin(isAdmin, username) {
+    if (isAdmin == true)
+        postResponseMessage("Yes you are " + username);
+    else
+        postResponseMessage("No you are not " + username);
+}
+
+function changeMap(themap) {
+    var validMap = false;
+    $('select#map option').each(function () {
+        if ($(this).val() == themap) {
+            validMap = true;
+        }
+    });
+    if (validMap) {
+        ajaxData = {
+            gametype: "KFGameContent.KFGameInfo_Survival",
+            urlextra: "?maxplayers=6",
+            mutatorGroupCount: "0",
+            action: "change",
+            map: themap
+        };
+        postResponseMessage("Changing map to " + themap);
+        $.ajax({
+            type: 'POST',
+            url: "/ServerAdmin/current/change",
+            data: ajaxData,
+            success: function () {
+                console.log("Changing map to " + themap)
+            },
+            error: gameSummaryAjaxError
+        });
+    }
+    else {
+        postResponseMessage(themap + " is not a valid map!")
+    }
+    // would be called from inside parseMessage(input,index)
+    // mapchange command in current_change.js
+}
+
+function getMapList() {
+    requestData = {ajax: 1, gametype: "KFGameContent.KFGameInfo_Survival"};
+    requestData.mutatorGroupCount = 0;
+    $.ajax({
+        type: "POST",
+        url: '/ServerAdmin/current/change+data',
+        data: requestData,
+        success: function (data) {
+            $('body').append("<div style='display:none;'>" + data + "</div>");
+        },
+        error: ajaxError
+    });
+}
+
 // Post message to chat console, splits string at semicolon + space and posts it after n seconds
 // String => Array => String => AJAX
 function postAutoMessage(auto_message) {
@@ -356,13 +439,6 @@ function refreshGameSummary() {
     });
 }
 
-// Change map command
-// TODO: voting algorithm before non admin users can call on that
-function changeMap(map) {
-    // would be called from inside parseMessage(input,index)
-    // mapchange command in current_change.js
-}
-
 
 // Read message and output action / answer according to it
 // Str x Int => Func
@@ -408,7 +484,9 @@ function parseMessage(input, index) {
             setTimeout(postResponseMessage(cmd_help[i]), 1000 * i);
         }
     } else if (input == "!amiadmin") {
-        isAdmin(player);
+        adminCommand(player, "!amiadmin", null);
+    } else if (input.split(' ')[0] == "!changemap") {
+        adminCommand(player, "!changemap", input.split(' ')[1]);
     } else if (input == "!motd") {
         var tmp = ($('#autochat_txtbox').val()).split("; ");
         getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="' + img + '" />';
@@ -628,16 +706,6 @@ function shoveOffYouTosser() {
 // Creates status div near Logo that shows status of announcements
 // NULL => HTML
 function addStatusDiv(iterations) {
-    $('body').append("<div id='players-list' style='display:none;'></div>");
-    Array.prototype.clean = function (deleteValue) {
-        for (var i = 0; i < this.length; i++) {
-            if (this[i] == deleteValue) {
-                this.splice(i, 1);
-                i--;
-            }
-        }
-        return this;
-    };
     if (!isDefined($('#infobox')[0])) {
         var infotext = document.createElement("p");
         var infoParent = document.getElementById("header");
