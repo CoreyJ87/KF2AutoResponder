@@ -183,6 +183,17 @@
  }
  array.clean("");*/
 
+Array.prototype.clean = function (deleteValue) {
+ for (var i = 0; i < this.length; i++) {
+  if (this[i] == deleteValue) {
+   this.splice(i, 1);
+   i--;
+  }
+ }
+ return this;
+};
+
+
 // Asynchronous instruction handling by javascript forces me to do funny shit like this:
 //  if (datum.getMilliseconds() % 2 !== 0) {
 // Maybe get unix timestamp, divide by bigger number and introduce random numbers to ice the cake
@@ -197,3 +208,14 @@ liveAdjust: 1
 settings_GameDifficulty_raw: 0 1 2 3
 
  */
+
+
+// Check for double posts by same person (maybe useful later)
+//    var msg_prev = [getPlayerName(last_message-1),getPlayerMessage(last_message-1)];
+//    var msg_new = [getPlayerName(last_message),getPlayerMessage(last_message)];
+//    console.log("Old msg: " + msg_prev + "\nNew msg: " + msg_new);
+//    if (msg_new != msg_prev) {
+//        var msg_chng = msg_new;
+//    } else {
+//        var msg_chng = [0,0];
+//    }

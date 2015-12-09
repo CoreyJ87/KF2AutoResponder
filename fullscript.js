@@ -38,8 +38,6 @@ var cmd_help = [
     "SC, FP, !iz, !ip, !slap <target>"];
 // List of admin cmds, a check needs to be implemented to test if the user is logged in as admin or the name is in the admin list
 var cmd_adm_help = ["Admin Commands(!admin):", "!switchmap, !setmap KF-Map, !restartmap", "!setdiff,  !setmessage, !kick !setpw"];
-var cmd_mapchange = "Majority of currently " + getGameDetails()[1] + " Players must type !mapchange to switch to a random map"; // mapchange info
-var cmd_mapvote = ["Mapvoting initiated. Vote ends after " + mapvote_time + " seconds.", "Example: !mapvote kf-burningparis to vote"];
 var cmd_insult_player = [
     "Nob off, you tosspot!",
     "My granny shoots better than you!",
@@ -164,119 +162,6 @@ var img_executed = 'data:image/gif;base64,R0lGODlhDwAPAIABAP//AAAAACH5BAEKAAEALA
  ----- Functions ------|
  ---------------------*/
 
-/*
- ----- GET, COMPARE STUFF, AND OTHER HELPERS -----
- */
-
-// Helper to check if a variable is empty or undefined
-// Obj => Bool
-function isDefined(object) {
-    return (typeof object !== 'undefined' && object !== null && object !== '');
-}
-
-// Compare two URL Strings that aren't empty, split them at anchor / div marker '#' by default
-// String x String => Boolean
-// TODO: Replace by jQuery.. or dont
-function cmpUrl(haystack, needle) {
-    needle = needle.split('#');
-    //    if (typeof haystack == 'undefined' || typeof needle == 'undefined' || haystack.includes(needle[0]) === false	|| haystack === ''	|| needle === '') {
-    if (!isDefined(haystack) || !isDefined(needle[0]) || !(haystack.includes(needle[0]))) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
-function escapeRegExp(str) {
-    return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
-}
-
-// Help function to construct jQuery element searches
-// String x String => Obj
-function getNodeObj(type_name, object_name) {
-    var obj_array = [];
-    if (!isDefined(type_name) || !isDefined(object_name)) {
-        return false;
-    } else {
-        return $('[' + type_name + '="' + object_name + '"]');
-    }
-}
-
-
-// Calls url-compare function to check if the directory is supported by the script
-// You can remove the check, but remember to call the html constructors (addAutoChatDiv, shoveOffYouTosser, addInfoDiv)
-// In Firefox the alert appears as a popup message even though the site has an interface for it,  remove if it gets too annoying.
-// NULL => Proc
-function checkUrl() {
-    if (cmpUrl(target_url, location.pathname)) {
-        addAutoChatDiv();
-        getMapList();
-        Array.prototype.clean = function (deleteValue) {
-            for (var i = 0; i < this.length; i++) {
-                if (this[i] == deleteValue) {
-                    this.splice(i, 1);
-                    i--;
-                }
-            }
-            return this;
-        };
-        setTimeout(shoveOffYouTosser(), 500);
-        setTimeout(addInfoDiv(), 500);
-        setTimeout(addStatusDiv(), 500);
-    } else {
-        self.alert("Target subdirectory:\n" + target_url + "\n\nAutoChat will be inactive until you enter the target dir.");
-    }
-}
-
-// Sleep function, in case a timeout is not the right tool
-// But don't use it in loops that you want to complete, because the break leaves not just this one but any loop it is executed it
-// Int => SLEEP
-function breakLoop(seconds) {
-    biggestnumberintheworld = 999999999;
-    var timestamp = new Date().getTime();
-    for (i = 0; i <= biggestnumberintheworld; i++) {
-        if ((new Date().getTime() - timestamp) > seconds * 1000) {
-            break;
-        }
-    }
-}
-
-// Help function to recursively add delay to each to be looped element
-// Int x Int x Int x Proc => Proc
-function waitForIt(index, n_times, delay, cmd) {
-    // Break condition
-    if (index >= n_times) {
-        return;
-    } else {
-        // Execute and increment
-        cmd(index);
-        index++;
-    }
-    // Steps taken, next run
-    breakLoop(delay);
-    waitForIt(index, n_times, delay, cmd);
-}
-
-// Picks a random key from an array and returns its value
-// Array => Witchcraft => String
-function getRandomItem(array) {
-    if (!isDefined(array) || typeof array !== 'object') {
-        return false;
-    }
-    var ary_size = array.length;
-    var ary_index = Math.floor(Math.random() * ary_size);
-
-    return array[ary_index];
-}
-
-// Rolls an n sided dice and returns the result
-// Num => Num
-function rollDice(sides) {
-    (!isDefined(sides) || typeof sides !== 'number' || sides <= 0) ? (sides = 6) : (false);
-    sides = Math.round(sides);
-    return Math.floor(Math.random() * sides) + 1;
-}
-
 
 /*
  ----- READ, POST MESSAGES AND EXECUTE COMMANDS -----
@@ -330,6 +215,14 @@ function adminCommand(username, command, parameter) {
         },
         error: ajaxError
     });
+}
+
+// Rolls an n sided dice and returns the result
+// Num => Num
+function rollDice(sides) {
+    (!isDefined(sides) || typeof sides !== 'number' || sides <= 0) ? (sides = 6) : (false);
+    sides = Math.round(sides);
+    return Math.floor(Math.random() * sides) + 1;
 }
 
 function isAdmin(isAdmin, username) {
@@ -440,64 +333,6 @@ function getMapList() {
     });
 }
 
-
-// Post message to chat console, splits string at semicolon + space and posts it after n seconds
-// String => Array => String => AJAX
-function postAutoMessage(auto_message) {
-    var auto_message_ary = auto_message.split("; ");
-    i = 0; // index start
-
-    if ($('#autochat_delay').val() >= 0) {
-        jan_delay = $('#autochat_delay').val();
-    } else {
-        jan_delay = 2;
-    }
-
-    waitForIt(i, auto_message_ary.length, jan_delay, function (i) {
-        $.ajax({
-            type: 'POST',
-            url: pageUri + '+data',
-            data: {
-                ajax: 1,
-                message: auto_message_ary[i],
-                teamsay: -1
-            },
-            success: chatMessage,
-            error: ajaxError
-        });
-    });
-}
-
-// Quickpost a message, can be used by autoresponder functions, no delay, no separators
-// Str => Proc
-function postResponseMessage(message) {
-    $.ajax({
-        type: 'POST',
-        url: pageUri + '+data',
-        data: {
-            ajax: 1,
-            message: message,
-            teamsay: -1
-        },
-        success: chatMessage,
-        error: ajaxError
-    });
-}
-
-
-function refreshGameSummary() {
-    $.ajax({
-        type: 'POST',
-        url: webadminPath + '/current+gamesummary',
-        data: {
-            ajax: 1
-        },
-        success: newGameSummary,
-        error: gameSummaryAjaxError
-    });
-}
-
-
 // Read message and output action / answer according to it
 // Str x Int => Func
 function parseMessage(input, index) {
@@ -578,93 +413,6 @@ function parseMessage(input, index) {
     }
 
     getNodeObj('class', 'teamcolor')[index].innerHTML = '<img src="' + img + '" />';
-}
-
-
-/*
- ----- OTHER FUNCTIONS / NOT YET USED OR NO CATEGORY ------
- */
-
-// List all messages currently visible in the chat log window
-// NULL => Array
-// ToDo: Timestamps, ids and stuff (only temp timestamps and ids possible without api access)
-function getAllMessages() {
-    var cm_ary_ind = [];
-    var messages_ary = [];
-
-    cm_ary_ind[0] = getNodeObj("class", "chatmessage").length - 1;
-    cm_ary_ind[1] = getNodeObj("class", "chatmessage")[0].children.length - 1;
-    for (var row_i = 0; row_i <= cm_ary_ind[0]; row_i++) {
-        messages_ary[row_i] = [];
-        for (var col_i = 0; col_i <= cm_ary_ind[1]; col_i++) {
-            if (col_i === 0) {
-                // ID as Placeholder
-                messages_ary[row_i][col_i] = 'msg_[' + row_i + col_i + ']';
-            } else if (col_i == 1) {
-                // Player Name
-                messages_ary[row_i][col_i] = jackTheStripper(getPlayerName(row_i));
-            } else if (col_i == 2) {
-                // Message text
-                messages_ary[row_i][col_i] = jackTheStripper(getPlayerMessage(row_i));
-            } else {
-                // Default for who knows what situation
-                messages_ary[row_i][col_i] = '---';
-            }
-        }
-    }
-    return messages_ary;
-}
-
-
-// Get user name belonging to chatmessage index
-// Int -> String
-function getPlayerName(index) {
-    return getNodeObj('class', 'chatmessage')[index].children[1].innerHTML;
-}
-
-// Get message text belonging to chatmessage index
-// Int => String
-function getPlayerMessage(index) {
-    return getNodeObj('class', 'chatmessage')[index].children[2].innerHTML;
-}
-
-// Get number of players from game status info as [Current, Max]
-// NULL => Array(Int,Int)
-function getNumPlayers() {
-    var inner_html = getNodeObj('class', 'gs_players')[1].innerHTML;
-    var output = inner_html.split('/');
-    return output;
-}
-
-// Get wave and number of zeds from game status info as [Current, Max]
-// NULL => Array(Int,Int,Int,Int,Int)
-function getWaveStatus() {
-    var output = [];
-    output[0] = ((getNodeObj('class', 'gs_wave')[0].innerHTML).split(' '))[1]; //wave
-    tmp_wave = (getNodeObj('class', 'gs_wave')[1].innerHTML).split('/');
-    tmp_players = (getNodeObj('class', 'gs_players')[1].innerHTML.split('/'));
-    output[1] = tmp_wave[0]; // zeds killed
-    output[2] = tmp_wave[1]; // zeds total
-    output[3] = tmp_players[0]; // players
-    output[4] = tmp_players[1]; //player max (6)
-    return output;
-}
-
-// Alternative approach for getting game details
-function getGameDetails() {
-    var output = [
-        $('#gamesummary-details')[0].getElementsByTagName('dd')[0].innerHTML, // Map
-        $('#gamesummary-details')[0].getElementsByTagName('dd')[1].innerHTML,  // x/n players
-        $('#gamesummary-details')[0].getElementsByTagName('dd')[2].innerHTML  // x/n zeds
-    ];
-    return output;
-}
-
-
-// Strips user chat entries from possible  script breaking characters, if not already filtered by server
-// TODO: test Security or replace by jQuery, or just dont
-function jackTheStripper(input_str) {
-    return input_str.replace(/\\<>\'\"\{\}/g, '');
 }
 
 /*
@@ -770,7 +518,6 @@ function addStatusDiv(iterations) {
         infotext.style.left = "400px";
         infotext.style.position = "absolute";
     } else {
-
         if (!$('#autochat_chckbox')[0].checked || getNumPlayers()[0] == 0) {
             (getNumPlayers()[0] == 0) ? (message = "(Pause) No Players detected") : (message = "Auto Announcement Deactivated");
             $('#infobox')[0].innerHTML = "<span style='color: grey;'>" + message + "<br />"
@@ -783,15 +530,28 @@ function addStatusDiv(iterations) {
     }
 }
 
-// Function to scroll down
-function getDown(targetid) {
-    getNodeObj('id', targetid)[0].scrollTop = getNodeObj('id', targetid)[0].scrollHeight;
-}
+/*
+ ----- ENTRY POINT -----
+ */
+// Check and modify current page
+checkUrl();
+// Call check script once a second
+setTimeout(setInterval(checkTheStuff, 1000), 5000);
 
-// Helper for easier use of delays when replacing
-function replaceMe(old_obj, new_obj) {
-    old_obj.innerHTML = new_obj;
-    return new_obj;
+// Calls url-compare function to check if the directory is supported by the script
+// You can remove the check, but remember to call the html constructors (addAutoChatDiv, shoveOffYouTosser, addInfoDiv)
+// In Firefox the alert appears as a popup message even though the site has an interface for it,  remove if it gets too annoying.
+// NULL => Proc
+function checkUrl() {
+    if (cmpUrl(target_url, location.pathname)) {
+        addAutoChatDiv();
+        getMapList();
+        setTimeout(shoveOffYouTosser(), 500);
+        setTimeout(addInfoDiv(), 500);
+        setTimeout(addStatusDiv(), 500);
+    } else {
+        self.alert("Target subdirectory:\n" + target_url + "\n\nAutoChat will be inactive until you enter the target dir.");
+    }
 }
 
 /*
@@ -836,18 +596,6 @@ function checkTheStuff() {
         refreshGameSummary();
     }
 
-
-    // Check for double posts by same person (maybe useful later)
-    //    var msg_prev = [getPlayerName(last_message-1),getPlayerMessage(last_message-1)];
-    //    var msg_new = [getPlayerName(last_message),getPlayerMessage(last_message)];
-    //    console.log("Old msg: " + msg_prev + "\nNew msg: " + msg_new);
-    //    if (msg_new != msg_prev) {
-    //        var msg_chng = msg_new;
-    //    } else {
-    //        var msg_chng = [0,0];
-    //    }
-
-
     // The following routines could be extended to check the whole message array (or last 5 entries or so) and add status icons
     // to each message parsed / ignored. While that would allow for a check of all messages, it could cause problems
     // when refreshing the page. Some kind of function for an internal todo-Queue would be better but feels unneccessary complicated
@@ -880,10 +628,239 @@ function checkTheStuff() {
 
 
 /*
- ----- ENTRY POINT -----
+------------Utility Functions------------------
  */
 
-// Check and modify current page
-checkUrl();
-// Call check script once a second
-setTimeout(setInterval(checkTheStuff, 1000), 5000);
+// Sleep function, in case a timeout is not the right tool
+// But don't use it in loops that you want to complete, because the break leaves not just this one but any loop it is executed it
+// Int => SLEEP
+function breakLoop(seconds) {
+    biggestnumberintheworld = 999999999;
+    var timestamp = new Date().getTime();
+    for (i = 0; i <= biggestnumberintheworld; i++) {
+        if ((new Date().getTime() - timestamp) > seconds * 1000) {
+            break;
+        }
+    }
+}
+
+// Help function to recursively add delay to each to be looped element
+// Int x Int x Int x Proc => Proc
+function waitForIt(index, n_times, delay, cmd) {
+    // Break condition
+    if (index >= n_times) {
+        return;
+    } else {
+        // Execute and increment
+        cmd(index);
+        index++;
+    }
+    // Steps taken, next run
+    breakLoop(delay);
+    waitForIt(index, n_times, delay, cmd);
+}
+
+// Picks a random key from an array and returns its value
+// Array => Witchcraft => String
+function getRandomItem(array) {
+    if (!isDefined(array) || typeof array !== 'object') {
+        return false;
+    }
+    var ary_size = array.length;
+    var ary_index = Math.floor(Math.random() * ary_size);
+
+    return array[ary_index];
+}
+
+// Help function to construct jQuery element searches
+// String x String => Obj
+function getNodeObj(type_name, object_name) {
+    if (!isDefined(type_name) || !isDefined(object_name)) {
+        return false;
+    } else {
+        return $('[' + type_name + '="' + object_name + '"]');
+    }
+}
+
+
+// Get user name belonging to chatmessage index
+// Int -> String
+function getPlayerName(index) {
+    return getNodeObj('class', 'chatmessage')[index].children[1].innerHTML;
+}
+
+// Get message text belonging to chatmessage index
+// Int => String
+function getPlayerMessage(index) {
+    return getNodeObj('class', 'chatmessage')[index].children[2].innerHTML;
+}
+
+// Get number of players from game status info as [Current, Max]
+// NULL => Array(Int,Int)
+function getNumPlayers() {
+    var inner_html = getNodeObj('class', 'gs_players')[1].innerHTML;
+    var output = inner_html.split('/');
+    return output;
+}
+
+// Get wave and number of zeds from game status info as [Current, Max]
+// NULL => Array(Int,Int,Int,Int,Int)
+function getWaveStatus() {
+    var output = [];
+    output[0] = ((getNodeObj('class', 'gs_wave')[0].innerHTML).split(' '))[1]; //wave
+    tmp_wave = (getNodeObj('class', 'gs_wave')[1].innerHTML).split('/');
+    tmp_players = (getNodeObj('class', 'gs_players')[1].innerHTML.split('/'));
+    output[1] = tmp_wave[0]; // zeds killed
+    output[2] = tmp_wave[1]; // zeds total
+    output[3] = tmp_players[0]; // players
+    output[4] = tmp_players[1]; //player max (6)
+    return output;
+}
+// List all messages currently visible in the chat log window
+// NULL => Array
+// ToDo: Timestamps, ids and stuff (only temp timestamps and ids possible without api access)
+function getAllMessages() {
+    var cm_ary_ind = [];
+    var messages_ary = [];
+
+    cm_ary_ind[0] = getNodeObj("class", "chatmessage").length - 1;
+    cm_ary_ind[1] = getNodeObj("class", "chatmessage")[0].children.length - 1;
+    for (var row_i = 0; row_i <= cm_ary_ind[0]; row_i++) {
+        messages_ary[row_i] = [];
+        for (var col_i = 0; col_i <= cm_ary_ind[1]; col_i++) {
+            if (col_i === 0) {
+                // ID as Placeholder
+                messages_ary[row_i][col_i] = 'msg_[' + row_i + col_i + ']';
+            } else if (col_i == 1) {
+                // Player Name
+                messages_ary[row_i][col_i] = jackTheStripper(getPlayerName(row_i));
+            } else if (col_i == 2) {
+                // Message text
+                messages_ary[row_i][col_i] = jackTheStripper(getPlayerMessage(row_i));
+            } else {
+                // Default for who knows what situation
+                messages_ary[row_i][col_i] = '---';
+            }
+        }
+    }
+    return messages_ary;
+}
+
+// Post message to chat console, splits string at semicolon + space and posts it after n seconds
+// String => Array => String => AJAX
+function postAutoMessage(auto_message) {
+    var auto_message_ary = auto_message.split("; ");
+    i = 0; // index start
+
+    if ($('#autochat_delay').val() >= 0) {
+        jan_delay = $('#autochat_delay').val();
+    } else {
+        jan_delay = 2;
+    }
+
+    waitForIt(i, auto_message_ary.length, jan_delay, function (i) {
+        $.ajax({
+            type: 'POST',
+            url: pageUri + '+data',
+            data: {
+                ajax: 1,
+                message: auto_message_ary[i],
+                teamsay: -1
+            },
+            success: chatMessage,
+            error: ajaxError
+        });
+    });
+}
+
+// Quickpost a message, can be used by autoresponder functions, no delay, no separators
+// Str => Proc
+function postResponseMessage(message) {
+    $.ajax({
+        type: 'POST',
+        url: pageUri + '+data',
+        data: {
+            ajax: 1,
+            message: message,
+            teamsay: -1
+        },
+        success: chatMessage,
+        error: ajaxError
+    });
+}
+
+
+function refreshGameSummary() {
+    $.ajax({
+        type: 'POST',
+        url: webadminPath + '/current+gamesummary',
+        data: {
+            ajax: 1
+        },
+        success: newGameSummary,
+        error: gameSummaryAjaxError
+    });
+}
+
+
+/*
+ ----- GET, COMPARE STUFF, AND OTHER HELPERS -----
+ */
+
+// Strips user chat entries from possible  script breaking characters, if not already filtered by server
+// TODO: test Security or replace by jQuery, or just dont
+function jackTheStripper(input_str) {
+    return input_str.replace(/\\<>\'\"\{\}/g, '');
+}
+
+// Helper to check if a variable is empty or undefined
+// Obj => Bool
+function isDefined(object) {
+    return (typeof object !== 'undefined' && object !== null && object !== '');
+}
+
+// Compare two URL Strings that aren't empty, split them at anchor / div marker '#' by default
+// String x String => Boolean
+// TODO: Replace by jQuery.. or dont
+function cmpUrl(haystack, needle) {
+    needle = needle.split('#');
+    //    if (typeof haystack == 'undefined' || typeof needle == 'undefined' || haystack.includes(needle[0]) === false	|| haystack === ''	|| needle === '') {
+    if (!isDefined(haystack) || !isDefined(needle[0]) || !(haystack.includes(needle[0]))) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+function escapeRegExp(str) {
+    return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+// Function to scroll down
+function getDown(targetid) {
+    getNodeObj('id', targetid)[0].scrollTop = getNodeObj('id', targetid)[0].scrollHeight;
+}
+
+// Helper for easier use of delays when replacing
+function replaceMe(old_obj, new_obj) {
+    old_obj.innerHTML = new_obj;
+    return new_obj;
+}
+
+
+/*
+ ----- OTHER FUNCTIONS / NOT YET USED OR NO CATEGORY ------
+ */
+
+// Alternative approach for getting game details
+function getGameDetails() {
+    var output = [
+        $('#gamesummary-details')[0].getElementsByTagName('dd')[0].innerHTML, // Map
+        $('#gamesummary-details')[0].getElementsByTagName('dd')[1].innerHTML,  // x/n players
+        $('#gamesummary-details')[0].getElementsByTagName('dd')[2].innerHTML  // x/n zeds
+    ];
+    return output;
+}
+
+var cmd_mapchange = "Majority of currently " + getGameDetails()[1] + " Players must type !mapchange to switch to a random map"; // mapchange info
+var cmd_mapvote = ["Mapvoting initiated. Vote ends after " + mapvote_time + " seconds.", "Example: !mapvote kf-burningparis to vote"];
